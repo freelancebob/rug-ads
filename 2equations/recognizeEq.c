@@ -1,4 +1,4 @@
-// By Kevin Poeze (S NUM TODO) and Dylan Todorov (S6277438)
+// By Kevin Poeze (S6403727) and Dylan Todorov (S6277438)
 
 // NOTE!!!
 // This is one of the files for us to submit
@@ -14,6 +14,7 @@
 #include <stdio.h>  /* printf */
 #include <stdlib.h> /* NULL, free */
 #include <string.h> /* strcmp */
+#include <math.h> /* round */
 
 int max(int a, int b) {
   return (a > b) ? a : b;
@@ -148,6 +149,7 @@ void recognizeEquations() {
   // keep reading inputs until a '!' is found
   while (ar[0] != '!') {
     tl = tokenList(ar);
+    List copyTl = tl;
     List originalTl = tl;
     
     // printf("the token list is ");
@@ -215,6 +217,127 @@ void recognizeEquations() {
         printf("this is an equation, but not in 1 variable\n");
       } else {
         printf("this is an equation in 1 variable of degree %d\n", degree);
+
+        if (degree == 1) {
+          // possible to solve
+          // these are the state variables
+          int leftVarFactor = 0;
+          int rightConstant = 0;
+
+          int left = 1; // 1 = left side, 0 = right side
+          int cacheSign = 1; // 0 = -, 1 = +
+          int cacheFactor = 1;
+          int cacheIsConst = 1; // 0 = has variable (eg. 4x), 1 = is constant (eg. 4x^0)
+          int cacheWasEq = 0;
+
+          while (copyTl != NULL) {
+            // when this is 1 then the most recent term was finished (eg. 4x or 2) so it should be added to the state variables
+            int processTerm = 0;
+
+            // cacheSign might be changed before it can be used so save it
+            int thisSign = cacheSign;
+            int thisLeft = left;
+
+            if (copyTl->tt == Symbol) {
+              if (copyTl->t.symbol == '=') {
+                // we are now on the right side
+                processTerm = 1;
+                left = 0;
+                cacheWasEq = 1;
+                cacheSign = 1;
+              } else if (copyTl->t.symbol == '-') {
+                // a new term was found OR this is the very beginning of the equation and the first term is negative
+                cacheSign = 0;
+                if (copyTl != originalTl && !cacheWasEq) { 
+                  // if this is beginning of the equation then there is no term to process yet
+                  processTerm = 1;
+                }
+              } else if (copyTl->t.symbol == '+') {
+                // new term was found
+                cacheSign = 1;
+                processTerm = 1;
+              } else if (copyTl->t.symbol == '^') {
+                // immediately get the power
+                copyTl = copyTl->next;
+
+                // has to be a number, we already verified
+                if (copyTl->t.number == 0) {
+                  cacheIsConst = 1;
+                } 
+
+                // avoid counting whatever is after ^ as a constant or factor by accident
+                copyTl = copyTl->next;
+                continue;
+              }
+
+              if (copyTl->t.symbol != '=') {
+                cacheWasEq = 0;
+              }
+            } else {
+              cacheWasEq = 0;
+            }
+
+            if (processTerm) {
+              if (cacheIsConst) {
+                if (thisSign == 1) {
+                  rightConstant += cacheFactor * (thisLeft ? -1 : 1);
+                } else {
+                  rightConstant += cacheFactor * (thisLeft ? 1 : -1);
+                }
+              } else {
+                if (thisSign == 1) {
+                  leftVarFactor += cacheFactor * (thisLeft ? 1 : -1);
+                } else {
+                  leftVarFactor += cacheFactor * (thisLeft ? -1 : 1);
+                }
+              }
+
+              // reset the cache variables
+              // cacheSign = 1; 
+              cacheFactor = 1;
+              cacheIsConst = 1; 
+            } else {
+              if (copyTl->tt == Number) {
+                cacheFactor = copyTl->t.number;
+              } else if (copyTl->tt == Identifier) {
+                cacheIsConst = 0;
+              }
+            }
+
+            copyTl = copyTl->next;
+          }
+
+          // process the most recent term
+          if (cacheIsConst) {
+            if (cacheSign == 1) {
+              rightConstant += cacheFactor * (left ? -1 : 1);
+            } else {
+              rightConstant += cacheFactor * (left ? 1 : -1);
+            }
+          } else {
+            if (cacheSign == 1) {
+              leftVarFactor += cacheFactor * (left ? 1 : -1);
+            } else {
+              leftVarFactor += cacheFactor * (left ? -1 : 1);
+            }
+          }
+
+          // now we have the format ax = b 
+          // so to get x, we do b / a
+          if (leftVarFactor == 0) {
+            printf("not solvable\n");
+          } else {
+            double result = (double)(rightConstant) / (double)(leftVarFactor);
+            // printf("%dx = %d\n", leftVarFactor, rightConstant);
+            // printf("unrounded: %f\n", result);
+
+            if (result > -0.0005 && result < 0.0005) {
+              printf("solution: 0.000\n");
+            } else {
+              printf("solution: %0.3f\n", result);
+            }
+          }
+        }
       }
     } else {
       printf("this is not an equation\n");

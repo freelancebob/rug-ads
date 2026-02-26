@@ -33,27 +33,33 @@ int main(void) {
   // step 2: read in text
   int numUnknownWords = 0;
 
-  // BUG: This loop is wrong. It will read "one,twwo" as one word "onetwwo".
-  while (scanf("%45s", word) != EOF) {
-    trimWord(word);
-    if (!wordIsInDictionary(word, dictionary)) {
-      numUnknownWords++;
-      printf("%s\n", word);
-    }
-  }
-  // TODO: Replace the above while loop with a correct solution.
-  // Hints:
-  // - you should read one character at a time, using getchar()
-  // - alphabetical characters should be appended to the current word
-  // - any other symbol should terminate the word
-  // this code might be useful:
-  /*
   int index = 0;
   int c = EOF;
+
+  // current word being looked at
+  char currentWord[MAX_WORD_LENGTH + 1] = "";
+  int currentWordLength = 0;
+
   while ((c = getchar()) && c != EOF) {
-    // ...
+    if (isalpha(c)) {
+      // if the character is an alpha character
+      currentWord[currentWordLength] = tolower(c);
+      currentWordLength += 1;
+    } else {
+      // a non-alpha character was reached so check the currently stored word
+      if (currentWordLength > 0) {
+        // indicate end of string
+        currentWord[currentWordLength] = '\0';
+        if (!wordIsInDictionary(currentWord, dictionary)) {
+          numUnknownWords ++;
+          printf("%s\n", currentWord);
+        }
+      }
+
+      // no need to clear, the old word will be overwritten
+      currentWordLength = 0;
+    }
   }
-  */
 
   // step 3: print number of unknown words
   printf("%d\n", numUnknownWords);

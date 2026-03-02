@@ -7,12 +7,12 @@
 
 // maximum length for a word
 #define MAX_WORD_LENGTH 45
+#define ALPHABET_N 26
 
 // a dictionary is an array
 typedef struct Dictionary {
-  int wordsSize;
-  int wordsCapacity;
-  char **words;
+  bool is_word;
+  struct Dictionary *children[ALPHABET_N];
 } Dictionary;
 
 Dictionary *newEmptyDictionary();

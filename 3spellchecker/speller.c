@@ -1,4 +1,4 @@
-// a SLOW spell checker
+// a spell checker
 
 #include "dictionary.h"
 
@@ -33,7 +33,6 @@ int main(void) {
   // step 2: read in text
   int numUnknownWords = 0;
 
-  int index = 0;
   int c = EOF;
 
   // current word being looked at
@@ -50,6 +49,7 @@ int main(void) {
       if (currentWordLength > 0) {
         // indicate end of string
         currentWord[currentWordLength] = '\0';
+
         if (!wordIsInDictionary(currentWord, dictionary)) {
           numUnknownWords ++;
           printf("%s\n", currentWord);

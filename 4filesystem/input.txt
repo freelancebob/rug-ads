@@ -1,0 +1,16 @@
+ls /home
+cat /home/file.txt
+touch /home/a.txt /home/b.txt
+echo "hello world" > /home/out.txt
+echo "append this" >> /home/out.txt
+mkdir -p /home/dir1 /home/dir2
+mv /home/a.txt /home/dir1/a.txt
+cp /home/b.txt /home/dir2/b.txt
+cp -r /home/dir1 /home/dir1_copy
+rm /home/dir2/b.txt
+rm -r /home/dir1_copy
+cd /home/dir1
+find
+ln /home/dir1/a.txt /home/dir1/a_hard.txt
+ln -s /home/dir1/a.txt /home/dir1/a_sym.txt
+exit

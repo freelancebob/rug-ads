@@ -1,6 +1,7 @@
 #include "commands.h"
-
+#include "filesystem.h"
 #include "scanner.h"
+#include "memory.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -35,53 +36,98 @@ int find_cmd_idx(char const *cmd) {
     }
 
     fprintf(stderr, "Command not found\n");
-    exit(EXIT_FAILURE);
+    return -1;
+    // exit(EXIT_FAILURE);
 }
 
-void cmd_exit(DataStructure *ds) {
-    // TODO: Adapt this destruction to suit your data structure.
-    free(ds);
+// Remove the final element of a path token (usually a new file name) and returns it. Destructively edits the path token to exclude the final element. Returned string MUST BE FREED!
+char *splitFileNameFromPath(Token path) {
+    // remove the final part of the path (the new name) and store it
+    char *filename = safe_malloc(sizeof(char) * FILE_NAME_SIZE);
+    for (int i = path.len - 1; i >= 0; i --) {
+        if (path.str[i] == '/') {
+            strncpy(filename, &path.str[i + 1], path.len - i);
 
-    // TODO: Remove
-    puts("cmd_exit.");
+            path.str[i] = '\0';
+            path.len = i;
+
+            break;
+        } else if (i == 0) {
+            strcpy(filename, path.str);
+
+            path.str[0] = '\0';
+            path.len = 0;
+
+            break;
+        }
+    }
+
+    return filename;
 }
 
-void cmd_ls(char **input_buf, DataStructure *ds) {
+void cmd_exit(FileNode *root) {
+    deleteFile(root);
+}
+
+void cmd_ls(char **input_buf, FileNode *root) {
     // Read DIRPATH, or NULL when no dir is given
     Token dir = tokenize(input_buf, "\n");
 
-    // TODO: Replace with an implementation
-    if (dir.str) {
-        printf("cmd_ls. dir: %s (len = %d)\n", dir.str, dir.len);
+    if (dir.str == NULL){
+        for (int i = 0; i < root->fileCount; i++){
+            FileNode *temp = root->children[i];
+            printf("%s\n", temp->name);
+        }
     } else {
-        puts("cmd_ls. No dir given, use the root dir (or the current working dir if you do the corresponding bonus assignment)");
+        FileNode *found = getFileFromPath(root, dir.str);
+        if (found != NULL) {
+            for (int i = 0; i < found->fileCount; i++){
+                FileNode *tempFound = found->children[i];
+                printf("%s\n", tempFound->name); 
+            }
+        }
     }
 }
 
-void cmd_cat(char **input_buf, DataStructure *ds) {
-    // Read FILEPATH
+void cmd_cat(char **input_buf, FileNode *root) {
     Token filepath = tokenize(input_buf, "\n");
 
-    // TODO: Replace with an implementation
-    printf("cmd_cat. file_name: %s (len = %d)\n", filepath.str, filepath.len);
+    FileNode *found = getFileFromPath(root, filepath.str);
+    if (found != NULL) {
+        if (strcmp(found->contents, "") != 0) {
+            printf("%s\n", found->contents);
+        }
+    } else {
+        printf("BAD\n");
+    }
 }
 
-void cmd_touch(char **input_buf, DataStructure *ds) {
-    // TODO: Replace with an implementation.
-    // The loop repeatedly tokenizes FILEPATH until the end of the line.
-    printf("cmd_touch. Filepaths: ");
-    // Read first FILEPATH
+void cmd_touch(char **input_buf, FileNode *root) {
     Token filepath = tokenize(input_buf, " \n");
-    // While a next FILEPATH exists
+
     do {
-        printf("%s (len = %d) | ", filepath.str, filepath.len);
+        //
+        char *filename = splitFileNameFromPath(filepath);
+        FileNode *parent = getFileFromPath(root, filepath.str);
+
+        if (parent != NULL) {
+            if (parent->type == Directory) {
+                newRegularFile(filename, parent);
+            } else {
+                // printf("%s is not a directory.\n", filepath.str);
+            }
+        } else {
+            // printf("%s is an invalid path.\n", filepath.str);
+        }
+        
+        free(filename);
+
         // Try to read next FILEPATH
         filepath = tokenize(input_buf, " \n");
     } while (filepath.str);
-    putchar('\n');
 }
 
-void cmd_echo(char **input_buf, DataStructure *ds) {
+void cmd_echo(char **input_buf, FileNode *root) {
     // Advance past the first '"'
     ++*input_buf;
     // Read STRING until '"'
@@ -92,45 +138,124 @@ void cmd_echo(char **input_buf, DataStructure *ds) {
     Token overwriteOrAppend = tokenize(input_buf, " ");
     // Read FILEPATH
     Token filepath = tokenize(input_buf, " \n");
+    FileNode *found = getFileFromPath(root, filepath.str);
 
-    // TODO: Replace with an implementation
+    // create a new file if it doesnt exist yet
+    if (found == NULL) {
+        char *filename = splitFileNameFromPath(filepath);
+        FileNode *parent = getFileFromPath(root, filepath.str);
+
+        found = newRegularFile(filename, parent);
+        free(filename);
+    }
+
+    if (found->type != Regular) {
+        printf("Cannot write to directory file.\n");
+        return;
+    }
+
+    //Selects the correct function based on the amount of >'s
     if (overwriteOrAppend.len == 1) {
         // ">"
-        printf("cmd_echo. str: %s (len = %d) > filepath: %s (len = %d)\n", string.str, string.len, filepath.str, filepath.len);
+        writeFileContents(found, string.str);
+        
     } else {
         // ">>"
-        printf("cmd_echo. str: %s (len = %d) >> filepath: %s (len = %d)\n", string.str, string.len, filepath.str, filepath.len);
+        appendFileContents(found, string.str);
     }
 }
 
-void cmd_mkdir(char **input_buf, DataStructure *ds) {
+void cmd_mkdir(char **input_buf, FileNode *root) {
     // Advance past "-p "
     *input_buf += 3;
 
-    // TODO: Replace with an implementation.
     // The loop repeatedly tokenizes DIRPATH until the end of the line.
-    printf("cmd_mkdir. Dirs: ");
     // Read first DIRPATH
     Token dir = tokenize(input_buf, " \n");
     do {
-        printf("%s (len = %d) | ", dir.str, dir.len);
+        FileNode *directory = root;
+        if (dir.str[0] == '/') {
+            while (directory->parent != NULL) {
+                directory = directory->parent;
+            }
+        }
+
+        // iterate through all filenames in the given path
+        char *token = strtok(dir.str, "/");
+
+        while (token != NULL) {
+            if (strcmp(token, ".") == 0) {
+                token = strtok(NULL, "/");
+                continue;
+            }
+            
+            if (strcmp(token, "..") == 0) {
+                if (directory->parent != NULL) {
+                    directory = directory->parent;
+                }
+                token = strtok(NULL, "/");
+                continue;
+            }
+
+            // First check if a file already exists here
+            bool found = false;
+            for (int i = 0; i < directory->fileCount; i ++) {
+                if (strcmp(directory->children[i]->name, token) == 0) {
+                    directory = directory->children[i];
+                    found = true;
+                    break;
+                }
+            }
+
+            // Otherwise create a new directory file
+            if (found == false) {
+                FileNode *newDir = newDirectoryFile(token, directory);
+                directory = newDir;
+            }
+
+            token = strtok(NULL, "/");
+        }
+
         // Read optional subsequent DIRPATHs
         dir = tokenize(input_buf, " \n");
     } while (dir.str);
-    putchar('\n');
 }
 
-void cmd_mv(char **input_buf, DataStructure *ds) {
-    // Read PATH_1
+void cmd_mv(char **input_buf, FileNode *root) {
     Token path1 = tokenize(input_buf, " ");
-    // Read PATH_2
     Token path2 = tokenize(input_buf, " \n");
 
-    // TODO: Replace with an implementation
-    printf("cmd_mv. path1: %s (len = %d) | path2: %s (len = %d)\n", path1.str, path1.len, path2.str, path2.len);
+    // Paths are the same, so skip
+    if (strcmp(path1.str, path2.str) == 0) {
+        return;
+    }
+
+    // Process PATH_1
+    FileNode *fileToMove = getFileFromPath(root, path1.str);
+    if (fileToMove == NULL) {
+        printf("%s is not a valid directory.\n", path1.str);
+        return;
+    }
+
+    // Process PATH_2
+
+    char *newFilename = splitFileNameFromPath(path2);
+    FileNode *newParent = getFileFromPath(root, path2.str);
+
+    // check if a file with this name exists in the new path and delete it
+    for (int i = 0; i < newParent->fileCount; i ++) {
+        if (strcmp(newParent->children[i]->name, newFilename) == 0) {
+            deleteFile(newParent->children[i]);
+            break;
+        }
+    }
+
+    strcpy(fileToMove->name, newFilename);
+    moveFileToParent(fileToMove, newParent);
+    free(newFilename);
 }
 
-void cmd_cp(char **input_buf, DataStructure *ds) {
+void cmd_cp(char **input_buf, FileNode *root) {
     // If we see a '-', advance past "-r ".
     if (**input_buf == '-') {
         *input_buf += 3;
@@ -138,50 +263,111 @@ void cmd_cp(char **input_buf, DataStructure *ds) {
 
     // Read PATH_1
     Token path1 = tokenize(input_buf, " ");
+    FileNode *fileToCopy = getFileFromPath(root, path1.str);
+    if (fileToCopy == NULL) {
+        printf("%s is not a valid directory.\n", path1.str);
+        return;
+    }
+
     // Read PATH_2
     Token path2 = tokenize(input_buf, " \n");
+    
+    char *newFilename = splitFileNameFromPath(path2);
+    FileNode *newParent = NULL;
 
-    // TODO: Replace with an implementation
-    printf("cmd_cp. path1: %s (len = %d) | path2: %s (len = %d)\n", path1.str, path1.len, path2.str, path2.len);
+    if (path2.len > 0) {
+        newParent = getFileFromPath(root, path2.str);
+    } else {
+        newParent = root;
+        while (newParent->parent != NULL) {
+            newParent = newParent->parent;
+        }   
+    }
+
+    if (newParent == NULL) {
+        printf("%s is not a valid directory.\n", path2.str);
+        return;
+    }
+
+    // check if a file with this name exists in the new path and delete it
+    for (int i = 0; i < newParent->fileCount; i ++) {
+        if (strcmp(newParent->children[i]->name, newFilename) == 0) {
+            deleteFile(newParent->children[i]);
+            break;
+        }
+    }
+
+    copyFile(fileToCopy, newParent, newFilename);
+    free(newFilename);
 }
 
-void cmd_rm(char **input_buf, DataStructure *ds) {
+void cmd_rm(char **input_buf, FileNode *root) {
     // If we see a '-', advance past "-r ".
     if (**input_buf == '-') {
         *input_buf += 3;
     }
 
-    // TODO: Replace with an implementation.
     // The loop repeatedly tokenizes PATH until the end of the line.
-    printf("cmd_rm. Paths: ");
-    // Read first PATH
     Token path = tokenize(input_buf, " \n");
     do {
-        printf("%s (len = %d) | ", path.str, path.len);
-        // Read optional subsequent PATH
+        FileNode *found = getFileFromPath(root, path.str);
+
+        if (found != NULL) {
+            deleteFile(found);
+        }
+
         path = tokenize(input_buf, " \n");
     } while (path.str);
-    putchar('\n');
 }
 
-void cmd_cd(char **input_buf, DataStructure *ds) {
+void cmd_cd(char **input_buf, FileNode **workingDirectory) {
     // Read DIRPATH
     Token dir = tokenize(input_buf, " \n");
 
     // TODO: Replace with an implementation
-    if (dir.str) {
-        printf("cmd_cd. dir: %s (len = %d)\n", dir.str, dir.len);
+    if (dir.len > 0) {
+        FileNode *newDirectory = getFileFromPath(*workingDirectory, dir.str);
+        if (newDirectory == NULL) {
+            printf("Not a valid directory.");
+        } else {
+            *workingDirectory = newDirectory;
+        }
     } else {
-        puts("cmd_cd. No dir given. Set the working directory to the root directory");
+        // Repeatedly find parent until the root directory is reached
+        FileNode *thisDirectory = *workingDirectory;
+        while (thisDirectory->parent != NULL) {
+            thisDirectory = thisDirectory->parent;
+        }
+        *workingDirectory = thisDirectory;
+    }
+}
+    
+void cmd_find_recursive(FileNode *root, char *prefix) {
+    // Adds this file name to the prefix str (eg. from "/home", changes to "/home/etc")
+    char *newPrefix = safe_malloc(strlen(prefix) + strlen(root->name) + 2);
+    strcpy(newPrefix, prefix);
+    strcat(newPrefix, "/");
+    strcat(newPrefix, root->name);
+
+    printf("%s\n", newPrefix); 
+    
+    // this will already be in alphabetical order
+    for (int i = 0; i < root->fileCount; i ++) {
+        cmd_find_recursive(root->children[i], newPrefix);
+    }
+    
+    free(newPrefix);
+}
+
+void cmd_find(FileNode *root) {
+    printf(".\n");
+    // The first step will have a unique name (".") so use this function as a wrapper for the real recursive step
+    for (int i = 0; i < root->fileCount; i ++) {
+        cmd_find_recursive(root->children[i], ".");
     }
 }
 
-void cmd_find(DataStructure *ds) {
-    // TODO: Replace with an implementation
-    puts("cmd_find.");
-}
-
-void cmd_ln(char **input_buf, DataStructure *ds) {
+void cmd_ln(char **input_buf, FileNode *ds) {
     bool make_symlink = false;
     // If we see a '-', advance past "-s ".
     if (**input_buf == '-') {

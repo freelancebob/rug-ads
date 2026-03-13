@@ -1,16 +1,41 @@
-ls /home
-cat /home/file.txt
-touch /home/a.txt /home/b.txt
-echo "hello world" > /home/out.txt
-echo "append this" >> /home/out.txt
-mkdir -p /home/dir1 /home/dir2
-mv /home/a.txt /home/dir1/a.txt
-cp /home/b.txt /home/dir2/b.txt
-cp -r /home/dir1 /home/dir1_copy
-rm /home/dir2/b.txt
-rm -r /home/dir1_copy
-cd /home/dir1
-find
-ln /home/dir1/a.txt /home/dir1/a_hard.txt
-ln -s /home/dir1/a.txt /home/dir1/a_sym.txt
+mkdir -p /long/directory/structure/we
+mkdir -p /long/directory/structure/we/will/copy/directories/recursively/and/move/them
+mv /long/directory/structure long/structure
+ls
+ls /long
+ls /long/directory
+ls /long/structure
+cp -r /long/structure /long/fructure
+cp -r /long/fructure /long/truckture
+cp -r /long/truckture /SOMEDIRECTORY
+ls
+ls /long
+echo "a" > /long/truckture/we/will/bababa.txt
+echo "b" > /long/fructure/we/will/bababa.txt
+echo "c" > /SOMEDIRECTORY/we/will/bababa.txt
+cat /long/truckture/we/will/bababa.txt
+cat /long/fructure/we/will/bababa.txt
+cat /SOMEDIRECTORY/we/will/bababa.txt
+mv /SOMEDIRECTORY /rename
+cp -r /rename /SOMEDI
+cat /SOMEDI/we/will/bababa.txt
+echo "h" >> /SOMEDI/we/will/bababa.txt
+cat /SOMEDI/we/will/bababa.txt
+cp -r /SOMEDI /SOMEDIRECTORYNAME
+cat /SOMEDI/we/will/bababa.txt
+cat /SOMEDIRECTORYNAME/we/will/bababa.txt
+ls /SOMEDIRECTORYNAME/we/will/copy
+rm -r /SOMEDIRECTORYNAME/we/will/copy
+ls /SOMEDIRECTORYNAME/we/will
+ls /SOMEDIRECTORYNAME/we
+ls /SOMEDI/we/will/copy
+mkdir -p /a /b /c /d /e /f /g /h /i /j /k /l /z /y /x /w /v /u
+mkdir -p /aa /aaa /a0a /0aa /0a0a /000 /00 /0 /_hello /.hello /.a /.0 /.0/.0 /.0/.a/a /b /c /d /e /f /g /h /i /j /k /l /z /y /x /w /v /u
+ls
+ls /.0
+rm -r /.0/.a
+ls
+ls /.0
+rm -r /0aa
+ls /.
 exit
